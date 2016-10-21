@@ -349,8 +349,10 @@ module DHO
             end
         end
 
-        bucket_info = #AWS::S3::Bucket.find(path)
-        bucket_info.each do |obj|
+        #bucket_info = AWS::S3::Bucket.find(path)
+        #bucket_info.each do |obj|
+        bucket_info = s3.list_objects(bucket: path)#AWS::S3::Bucket.find(path)
+        bucket_info.contents.each do |obj|
             o = obj.key
             if (o =~ /deb$/) || (o =~ /Release$/) || (o =~ /Packages.gz$/) || (o =~ /Packages$/) || (o =~ /gpg$/)
                 unless new_content.include?(o)
