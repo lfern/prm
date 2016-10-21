@@ -8,7 +8,8 @@ require 'erb'
 require 'find'
 require 'thread'
 require 'peach'
-require 'aws/s3'
+#require 'aws/s3'
+require 'aws-sdk'
 require 'arr-pm'
 require File.join(File.dirname(__FILE__), 'rpm.rb')
 
@@ -307,18 +308,24 @@ module DHO
         component = pcomponent.join
         release = prelease.join
         puts object_store.inspect
-        AWS::S3::Base.establish_connection!(
-            :server             => object_store,
-            :use_ssl            => true,
-            :access_key_id      => accesskey,
-            :secret_access_key  => secretkey
+        #AWS::S3::Base.establish_connection!(
+        #    :server             => object_store,
+        #    :use_ssl            => true,
+        #    :access_key_id      => accesskey,
+        #    :secret_access_key  => secretkey
+        #)
+
+        #AWS::S3::Service.buckets.each do |bucket|
+        #    unless bucket == path
+        #        AWS::S3::Bucket.create(path)
+        #    end
+        #end
+        s3 = Aws::S3::Client.new(
+          access_key_id: accesskey,
+          secret_access_key: secretkey,
+          endpoint:object_store
         )
 
-        AWS::S3::Service.buckets.each do |bucket|
-            unless bucket == path
-                AWS::S3::Bucket.create(path)
-            end
-        end
 
         new_content = Array.new
         Find.find(path + "/") do |object|
@@ -326,24 +333,29 @@ module DHO
             if (object =~ /deb$/) || (object =~ /Release$/) || (object =~ /Packages.gz$/) || (object =~ /Packages$/) || (object =~ /gpg$/)
                 f = path + "/" + object
                 new_content << object
-                AWS::S3::S3Object.store(
-                    object,
-                    open(f),
-                    path
-                )
+                #AWS::S3::S3Object.store(
+                #    object,
+                #    open(f),
+                #    path
+                #)
+                File.open(f, 'rb') do |file|
+                  s3.put_object(bucket:path, key:object, body:file)
+                end
 
-                policy = AWS::S3::S3Object.acl(object, path)
-                policy.grants = [ AWS::S3::ACL::Grant.grant(:public_read) ]
-                AWS::S3::S3Object.acl(object,path,policy)
+                #policy = AWS::S3::S3Object.acl(object, path)
+                #policy.grants = [ AWS::S3::ACL::Grant.grant(:public_read) ]
+                #AWS::S3::S3Object.acl(object,path,policy)
+                s3.put_object_acl(bucket: path, key: object, acl: 'public-read')
             end
         end
 
-        bucket_info = AWS::S3::Bucket.find(path)
+        bucket_info = #AWS::S3::Bucket.find(path)
         bucket_info.each do |obj|
             o = obj.key
             if (o =~ /deb$/) || (o =~ /Release$/) || (o =~ /Packages.gz$/) || (o =~ /Packages$/) || (o =~ /gpg$/)
                 unless new_content.include?(o)
-                    AWS::S3::S3Object.delete(o,path)
+                    #AWS::S3::S3Object.delete(o,path)
+                    s3.delete_object(key: o, bucket: path)
                 end
             end
         end
