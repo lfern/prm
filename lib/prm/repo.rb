@@ -330,23 +330,28 @@ module DHO
         new_content = Array.new
         Find.find(path + "/") do |object|
             object.slice!(path + "/")
-            if (object =~ /deb$/) || (object =~ /Release$/) || (object =~ /Packages.gz$/) || (object =~ /Packages$/) || (object =~ /gpg$/)
+            # no filtrar, lo que se encuentre se sube if (object =~ /deb$/) || (object =~ /Release$/) || (object =~ /Packages.gz$/) || (object =~ /Packages$/) || (object =~ /gpg$/)
                 f = path + "/" + object
-                new_content << object
-                #AWS::S3::S3Object.store(
-                #    object,
-                #    open(f),
-                #    path
-                #)
-                File.open(f, 'rb') do |file|
-                  s3.put_object(bucket:path, key:object, body:file)
-                end
 
-                #policy = AWS::S3::S3Object.acl(object, path)
-                #policy.grants = [ AWS::S3::ACL::Grant.grant(:public_read) ]
-                #AWS::S3::S3Object.acl(object,path,policy)
-                s3.put_object_acl(bucket: path, key: object, acl: 'public-read')
-            end
+                # check if it is file
+                if File.file?(f)
+
+                  new_content << object
+                  #AWS::S3::S3Object.store(
+                  #    object,
+                  #    open(f),
+                  #    path
+                  #)
+                  File.open(f, 'rb') do |file|
+                    s3.put_object(bucket:path, key:object, body:file)
+                  end
+
+                  #policy = AWS::S3::S3Object.acl(object, path)
+                  #policy.grants = [ AWS::S3::ACL::Grant.grant(:public_read) ]
+                  #AWS::S3::S3Object.acl(object,path,policy)
+                  s3.put_object_acl(bucket: path, key: object, acl: 'public-read')
+                end
+            #end
         end
 
         #bucket_info = AWS::S3::Bucket.find(path)
@@ -354,12 +359,13 @@ module DHO
         bucket_info = s3.list_objects(bucket: path)#AWS::S3::Bucket.find(path)
         bucket_info.contents.each do |obj|
             o = obj.key
-            if (o =~ /deb$/) || (o =~ /Release$/) || (o =~ /Packages.gz$/) || (o =~ /Packages$/) || (o =~ /gpg$/)
+            # no filtrar en borrado if (o =~ /deb$/) || (o =~ /Release$/) || (o =~ /Packages.gz$/) || (o =~ /Packages$/) || (o =~ /gpg$/)
                 unless new_content.include?(o)
+                    puts "delete #{o}"
                     #AWS::S3::S3Object.delete(o,path)
                     s3.delete_object(key: o, bucket: path)
                 end
-            end
+            #end
         end
         puts "Your apt repository is located at http://#{object_store}/#{path}/"
         puts "Add the following to your apt sources.list"
